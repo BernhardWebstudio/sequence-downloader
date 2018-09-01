@@ -1,0 +1,4 @@
+[submodule "workshop"]
+	path = workshop
+	url = git@github.com:Mosai/workshop.git
+	branch = master
