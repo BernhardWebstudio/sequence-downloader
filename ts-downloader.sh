@@ -5,57 +5,83 @@
 
 # options to be set
 CONCAT=1
-DELETE_PARTIALS=0
+DELETE_PARTIALS=1
+
+# ---
+# global helper functions
+# check if an URL exists - https://stackoverflow.com/questions/2924422/how-do-i-determine-if-a-web-page-exists-with-shell-scripting
+function url_exists () {
+  STATUS=$(curl -s --head -w %{http_code} "$1" -o /dev/null)
+  [[ "$STATUS" = 200 ]] && return
+}
+
+# download file using wget – param 1 is the URL, param 2 the target file
+function download () {
+  wget --retry-connrefused --tries=25 -q -O $1 $2 # other possible options: --waitretry=1 --read-timeout=20 --timeout=15
+}
+
+# ---
+# actual program
 
 # empty call placeholder
 function tsd_ () {
-  mkdir partials
-  cd partials || echo "Error: Could not create temp directory." && exit 1
+  mkdir -p partials
+  cd partials #|| echo "Error: Could not create temp directory." && exit 1
 
   # number of urls as we can handle more than one
-  CNT=0
+  URL_CNT=0
 
   # handle all passed urls
   for URL in "$@"
   do
+    echo $URL
     # create folder for streaming media
-    CNT=$((CNT + 1))
-    mkdir $CNT
-    cd $CNT || exit
+    URL_CNT=$((URL_CNT + 1)) # there are syntax alternatives; e.g. (( URL_CNT++ ))
+
+    mkdir -p $URL_CNT
+    cd $URL_CNT || exit
 
     (
+      VIDEO_CNT=0
+      # attempts: how many not-existing urls to tolerate
+      ATTEMPT=0
+
       # download all videos
-      # TODO: change to while to check which exist at all
-      for VIDEO_CNT in {1..100}
-        do
-          # use 12 "threads" for download
-          for SUB_CNT in {1..12}
-          do
-            (
-              ACTUAL_CNT=$(($VIDEO_CNT*$SUB_CNT))
-              P_URL=$(echo $URL | sed 's/#/'$ACTUAL_CNT'/')
-              # TODO: handle errors
-              wget -q -O video$ACTUAL_CNT.ts $P_URL || true
-            ) &
-          done
-          wait
+      while [ $ATTEMPT -lt 10 ]
+      do
+        P_URL=$(echo $URL | sed 's/#/'$VIDEO_CNT'/')
+
+        if url_exists "$P_URL"
+        then
+          # download!
+          download video$VIDEO_CNT.ts $P_URL &
+        else
+          ATTEMPT=$(($ATTEMPT + 1))
+        fi
+        # we want to start at 0, that's why we increase last
+        VIDEO_CNT=$(($VIDEO_CNT + 1))
       done
       wait
+
+      echo "Downloaded $VIDEO_CNT files minus $ATTEMPT fails."
 
       # link videos
       if [ $CONCAT = 1 ]
         then
-          echo "video"{1..1200}".ts " | tr " " "\\n" > tslist.txt
-          while read line; do cat $line >> $CNT.mp4; done < tslist.txt
-          # concat finished, delete old
-          rm -rf video* tslist.txt
+          echo  "Linking..."
+          ls -1 -- video*.ts | sort -n -k1.6 > tslist.txt # Mac does not support ls -v, that is why sort is used too
+          while read -r line
+          do
+            cat $line >> $URL_CNT-all.ts;
+          done < tslist.txt
           # move file out of url dir, partials dir
-          mv $CNT.mp4 ../..
+          mv $URL_CNT-all.ts ../..
       fi
     ) &
-    # cd out of $CNT dir
+    # cd out of $URL_CNT dir
     cd ..
   done
+  wait
 
   # cd out of partials dir
   cd ..
@@ -64,8 +90,21 @@ function tsd_ () {
       rm -rf partials
   fi
 
+  echo "Processed $URL_CNT URLs"
+
   exit 0
 }
+
+function tsd_call_ () {
+  tsd_ "$@"
+}
+
+function tsd_command_url () {
+  tsd_ "$@"
+}
+
+# ---
+# parse & react to options
 
 function tsd_option_v () {
   echo "Version 0.0"
