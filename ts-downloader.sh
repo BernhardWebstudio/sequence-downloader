@@ -25,10 +25,10 @@ function download () {
 
 # empty call placeholder
 function tsd_ () {
-  DATE="$(date '+%Y-%m-%d-%H:%M:%S')"
+  DATE="$(date '+%Y-%m-%d-%H-%M-%S')"
   PARTIALSDIR="partials-${DATE}"
   mkdir -p "$PARTIALSDIR"
-  cd "$PARTIALSDIR" || echo "Error: Could not create temp directory." && exit 1
+  cd "$PARTIALSDIR" || { echo "Error: Could not create temp directory '$PARTIALSDIR'."; exit 1; }
 
   # number of urls as we can handle more than one
   URL_CNT=0
@@ -74,10 +74,10 @@ function tsd_ () {
           ls -1 -- video*.ts | sort -n -k1.6 > tslist.txt # Mac does not support ls -v, that is why sort is used too
           while read -r line
           do
-            cat $line >> $URL_CNT-all.ts;
+            cat "$line" >> "$DATE-$URL_CNT-all.ts";
           done < tslist.txt
           # move file out of url dir, partials dir
-          mv $URL_CNT-all.ts ../..
+          mv "$DATE-$URL_CNT-all.ts" ../..
       fi
     ) &
     # cd out of $URL_CNT dir
@@ -89,7 +89,7 @@ function tsd_ () {
   cd ..
   if [ $DELETE_PARTIALS = 1 ]
     then
-      rm -rf partials
+      rm -rf "$PARTIALSDIR"
   fi
 
   echo "Processed $URL_CNT URLs"
