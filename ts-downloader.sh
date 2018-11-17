@@ -25,8 +25,10 @@ function download () {
 
 # empty call placeholder
 function tsd_ () {
-  mkdir -p partials
-  cd partials #|| echo "Error: Could not create temp directory." && exit 1
+  DATE="$(date '+%Y-%m-%d-%H:%M:%S')"
+  PARTIALSDIR="partials-${DATE}"
+  mkdir -p "$PARTIALSDIR"
+  cd "$PARTIALSDIR" || echo "Error: Could not create temp directory." && exit 1
 
   # number of urls as we can handle more than one
   URL_CNT=0
